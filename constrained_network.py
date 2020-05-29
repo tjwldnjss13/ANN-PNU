@@ -11,6 +11,8 @@ class ConstrainedNet:
     train_acc_list = []
     valid_loss_list = []
     valid_acc_list = []
+    test_loss = 0
+    test_acc = 0
 
     def __init__(self, lr=.001, epochs=10):
         self.lr = lr
@@ -242,6 +244,8 @@ class ConstrainedNet:
 
         test_acc /= len(test_images)
         test_loss /= len(test_images)
+        self.test_acc = test_acc
+        self.test_loss = test_loss
         print('                    (Test) Accuracy : {:.4f}, Loss : {:.5f}'.format(test_acc, test_loss))
 
     def visualize(self):
@@ -249,8 +253,8 @@ class ConstrainedNet:
         train_losses = np.array(self.train_loss_list)
         valid_losses = np.array(self.valid_loss_list)
 
-        train_acces = np.array(self.train_acc_list)
-        valid_acces = np.array(self.valid_acc_list)
+        train_accs = np.array(self.train_acc_list)
+        valid_accs = np.array(self.valid_acc_list)
 
         plt.figure(0)
         plt.plot(epochs, train_losses, 'r-', label='Train loss')
@@ -259,8 +263,8 @@ class ConstrainedNet:
         plt.legend()
 
         plt.figure(1)
-        plt.plot(epochs, train_acces, 'r-', label='Train acc')
-        plt.plot(epochs, valid_acces, 'b:', label='Valid acc')
+        plt.plot(epochs, train_accs, 'r-', label='Train acc')
+        plt.plot(epochs, valid_accs, 'b:', label='Valid acc')
         plt.title('Train/Validation Acc')
         plt.legend()
 
