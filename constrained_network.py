@@ -270,6 +270,72 @@ class ConstrainedNet:
 
         plt.show()
 
+    @staticmethod
+    def bit_l2_cost_function(target, output):
+        return .5 * np.square(target - output)
+
+    @staticmethod
+    def l2_cost_function(target, output):
+        return np.mean(ConstrainedNet.bit_l2_cost_function(target, output))
+
+    @staticmethod
+    def bit_cost_function(target, output):
+        return -target * np.log(output) - (1 - target) * np.log(1 - output)
+
+    @staticmethod
+    def cost_function(target, output):
+        return np.mean(ConstrainedNet.bit_cost_function(target, output))
+
+    @staticmethod
+    def softmax_cross_entropy(target, softmax_class):
+        losses = 0
+        for i in range(len(target)):
+            if softmax_class[i] == 0:
+                losses += target[i] * np.log(.00001)
+            else:
+                losses += target[i] * np.log(softmax_class[i])
+        return -losses
+
+    @staticmethod
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
+
+    @staticmethod
+    def sigmoid_derv(x):
+        return ConstrainedNet.sigmoid(x) * (1 - ConstrainedNet.sigmoid(x))
+
+    @staticmethod
+    def softmax(x):
+        sum = np.sum(np.exp(x))
+        return np.exp(x) / sum
+
+    @staticmethod
+    def leaky_relu(x):
+        return np.maximum(.01 * x, x)
+
+    @staticmethod
+    def leaky_relu_derv(x):
+        if x > 0:
+            return 1
+        else:
+            return .01
+
+    @staticmethod
+    def relu(x):
+        return np.maximum(0, x)
+
+    @staticmethod
+    def relu_derv(x):
+        if x is 0:
+            return 1
+        else:
+            return 0
+
+    @staticmethod
+    def softmax(x):
+        exps = np.exp(x - np.max(x))
+        return exps / np.sum(exps)
+
 
 if __name__ == '__main__':
     cn1 = ConstrainedNet(lr=.001, epochs=500)

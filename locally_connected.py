@@ -342,5 +342,5 @@ class LocallyConnectedNet:
 if __name__ == '__main__':
     # SOBEL_Y : .00005
 
-    lcn1 = LocallyConnectedNet(lr=.00007, epochs=2000)
+    lcn1 = LocallyConnectedNet(lr=.000095, epochs=4000)
     lcn1.exec_all('../digit data', SOBEL_X)
