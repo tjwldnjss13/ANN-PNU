@@ -338,5 +338,5 @@ class ConstrainedNet:
 
 
 if __name__ == '__main__':
-    cn1 = ConstrainedNet(lr=.001, epochs=500)
+    cn1 = ConstrainedNet(lr=.0005, epochs=500)
     cn1.exec_all('../digit data', SOBEL_X)

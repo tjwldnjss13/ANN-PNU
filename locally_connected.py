@@ -33,9 +33,9 @@ class LocallyConnectedNet:
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
 
-        train_images, train_labels = images[:70], labels[:70]
-        valid_images, valid_labels = images[70:85], labels[70:85]
-        test_images, test_labels = images[85:], labels[85:]
+        train_images, train_labels = images[:60], labels[:60]
+        valid_images, valid_labels = images[60:80], labels[60:80]
+        test_images, test_labels = images[80:], labels[80:]
 
         self.train([train_images, train_labels], [valid_images, valid_labels])
         self.test([test_images, test_labels])
@@ -340,7 +340,11 @@ class LocallyConnectedNet:
 
 
 if __name__ == '__main__':
+    # SOBEL_X : .005 (0.30)
     # SOBEL_Y : .00005
-
-    lcn1 = LocallyConnectedNet(lr=.000095, epochs=4000)
-    lcn1.exec_all('../digit data', SOBEL_X)
+    # PREWITT_X : .00078 (0.3333)
+    # PREWITT_Y : .01 (0.4667)
+    # LAPLACIAN :
+    # LOG : .005 (.40)
+    lcn1 = LocallyConnectedNet(lr=.0019, epochs=350)
+    lcn1.exec_all('../digit data', SOBEL_Y)
