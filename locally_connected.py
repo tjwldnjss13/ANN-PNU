@@ -341,10 +341,10 @@ class LocallyConnectedNet:
 
 if __name__ == '__main__':
     # SOBEL_X : .005 (0.30)
-    # SOBEL_Y : .00005
+    # SOBEL_Y : .0017 (0.30)
     # PREWITT_X : .00078 (0.3333)
     # PREWITT_Y : .01 (0.4667)
     # LAPLACIAN :
     # LOG : .005 (.40)
-    lcn1 = LocallyConnectedNet(lr=.0019, epochs=350)
-    lcn1.exec_all('../digit data', SOBEL_Y)
+    lcn1 = LocallyConnectedNet(lr=.0005, epochs=2000)
+    lcn1.exec_all('./digit data', LAPLACIAN)

@@ -13,9 +13,12 @@ class ConstrainedNet:
     valid_acc_list = []
     test_loss = 0
     test_acc = 0
+    lr_list = []
 
-    def __init__(self, lr=.001, epochs=10):
+    def __init__(self, lr=.001, lr_decay=None, lr_decay_term=None, epochs=10):
         self.lr = lr
+        self.lr_decay = lr_decay
+        self.lr_decay_term = lr_decay_term
         self.lr_b = lr * 2
         self.epochs = epochs
 
@@ -31,9 +34,9 @@ class ConstrainedNet:
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
 
-        train_images, train_labels = images[:70], labels[:70]
-        valid_images, valid_labels = images[70:85], labels[70:85]
-        test_images, test_labels = images[85:], labels[85:]
+        train_images, train_labels = images[:350], labels[:350]
+        valid_images, valid_labels = images[350:425], labels[300:425]
+        test_images, test_labels = images[425:], labels[425:]
 
         self.train([train_images, train_labels], [valid_images, valid_labels])
         self.test([test_images, test_labels])
@@ -43,7 +46,7 @@ class ConstrainedNet:
         images = []
         labels = []
 
-        for n in range(10):
+        for n in range(50):
             for label in range(10):
                 fn = str(label) + '.' + str(n) + '.png'
                 image_path = os.path.join(fp, fn)
@@ -110,7 +113,11 @@ class ConstrainedNet:
         valid_images, valid_labels = valid_dataset[0], valid_dataset[1]
 
         for epoch in range(self.epochs):
+            if self.lr_decay is not None and self.lr_decay_term is not None:
+                if epoch != 0 and epoch % self.lr_decay_term == 0:
+                    self.lr *= self.lr_decay
             self.epoch_list.append(epoch)
+            self.lr_list.append(self.lr)
             print('[{}/{} epoch]'.format(epoch + 1, self.epochs), end='    ')
             train_acc = 0
             train_loss = 0
@@ -256,6 +263,8 @@ class ConstrainedNet:
         train_accs = np.array(self.train_acc_list)
         valid_accs = np.array(self.valid_acc_list)
 
+        lrs = np.array(self.lr_list)
+
         plt.figure(0)
         plt.plot(epochs, train_losses, 'r-', label='Train loss')
         plt.plot(epochs, valid_losses, 'b:', label='Valid loss')
@@ -267,6 +276,10 @@ class ConstrainedNet:
         plt.plot(epochs, valid_accs, 'b:', label='Valid acc')
         plt.title('Train/Validation Acc')
         plt.legend()
+
+        plt.figure(2)
+        plt.plot(epochs, lrs, 'g-', label='Learning curve')
+        plt.title('Learning Curve')
 
         plt.show()
 
@@ -338,5 +351,6 @@ class ConstrainedNet:
 
 
 if __name__ == '__main__':
-    cn1 = ConstrainedNet(lr=.0005, epochs=500)
-    cn1.exec_all('../digit data', SOBEL_X)
+    # SOBEL_X : .01 (.33)
+    cn1 = ConstrainedNet(lr=.01, epochs=500)
+    cn1.exec_all('./digit data', LAPLACIAN)
