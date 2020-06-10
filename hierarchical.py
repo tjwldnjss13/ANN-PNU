@@ -23,17 +23,12 @@ class HierarchicalNet:
         self.W_H1toH2 = 2 * np.random.random((5, 5)) - 1
         self.W_H2toO = 2 * np.random.random((16, 10)) - 1
 
-        self.b_H1 = 2 * np.random.random((8, 8)) - 1
-        self.b_H2 = 2 * np.random.random((4, 4)) - 1
-        self.b_O = 2 * np.random.random(10) - 1
-        # b_H1, b_H2, b_O = 1, 1, 1
-
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
 
-        train_images, train_labels = images[:70], labels[:70]
-        valid_images, valid_labels = images[70:85], labels[70:85]
-        test_images, test_labels = images[85:], labels[85:]
+        train_images, train_labels = images[:300], labels[:300]
+        valid_images, valid_labels = images[300:400], labels[300:400]
+        test_images, test_labels = images[400:], labels[400:]
 
         self.train([train_images, train_labels], [valid_images, valid_labels])
         self.test([test_images, test_labels])
@@ -126,7 +121,7 @@ class HierarchicalNet:
                     for i in range(8):
                         for j in range(8):
                             pre_H1[k1, i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] * self.W_ItoH1)
-                post_H1 = HierarchicalNet.relu(pre_H1) + self.b_H1
+                post_H1 = HierarchicalNet.relu(pre_H1)
 
                 pre_H2 = np.zeros((4, 4, 4))
                 for k1 in range(2):
@@ -134,25 +129,25 @@ class HierarchicalNet:
                         for i in range(4):
                             for j in range(4):
                                 pre_H2[k2, i, j] += np.sum(post_H1[k1, i:i + 5, j:j + 5] * self.W_H1toH2)
-                post_H2 = HierarchicalNet.relu(pre_H2) + self.b_H2
+                post_H2 = HierarchicalNet.relu(pre_H2)
 
                 post_H2_flattened = np.reshape(post_H2, 4 * 4 * 4)
                 pre_O = np.matmul(post_H2_flattened, self.W_H2toO)
-                post_O = HierarchicalNet.sigmoid(pre_O) + self.b_O
+                post_O = HierarchicalNet.softmax(pre_O)
 
-                softmax_class = HierarchicalNet.softmax(post_O)
-                softmax_ce = HierarchicalNet.softmax_cross_entropy(label, softmax_class)
-                if np.argmax(softmax_class) == np.argmax(label):
+                softmax_ce = HierarchicalNet.softmax_cross_entropy(label, post_O)
+                if np.argmax(post_O) == np.argmax(label):
                     train_acc += 1
                 train_loss += softmax_ce
 
                 # Backpropagate
                 # O
-                D_post_O = softmax_class - label
-                D_pre_O = D_post_O * HierarchicalNet.sigmoid_derv(pre_O)
-
-                # Bias (O)
-                self.b_O -= self.lr_b * D_post_O
+                D_post_O = post_O - label
+                D_pre_O = np.zeros(10)
+                softmax_derv_m = HierarchicalNet.softmax_derv(pre_O)
+                for i in range(10):
+                    for j in range(10):
+                        D_pre_O[i] += D_post_O[j] * softmax_derv_m[i, j]
 
                 # Weight (H2 -- O)
                 W_H2toO_old = self.W_H2toO
@@ -173,9 +168,6 @@ class HierarchicalNet:
                         for j in range(4):
                             D_pre_H2[k2, i, j] = D_post_H2[k2, i, j] * HierarchicalNet.relu_derv(pre_H2[k2, i, j])
 
-                # Bias (H2)
-                self.b_H2 -= self.lr_b * D_post_H2
-
                 # Weight (H1 -- H2)
                 W_H1toH2_old = self.W_H1toH2
                 for k1 in range(2):
@@ -188,9 +180,6 @@ class HierarchicalNet:
                 W_H1toH2_old_inv = np.flip(W_H1toH2_old)
                 D_pre_H2_padded = np.zeros((4, 12, 12))
                 D_pre_H2_padded[:, 4:8, 4:8] = D_pre_H2[:]
-                # for i in range(4, 8):
-                #     for j in range(4, 8):
-                #         D_pre_H2_padded[i,j] = D_pre_H2[i-4, j-4]
                 D_post_H1 = np.zeros((2, 8, 8))
                 D_pre_H1 = np.zeros((2, 8, 8))
                 for k1 in range(2):
@@ -203,9 +192,6 @@ class HierarchicalNet:
                     for i in range(8):
                         for j in range(8):
                             D_pre_H1[k1, i, j] = D_post_H1[k1, i, j] * HierarchicalNet.relu_derv(pre_H1[k1, i, j])
-
-                # Bias (H1)
-                self.b_H1 -= self.lr_b * D_post_H1
 
                 # Weight (I -- H1)
                 for k1 in range(2):
@@ -227,10 +213,10 @@ class HierarchicalNet:
                 image = valid_images[valid_idx]
                 label = valid_labels[valid_idx]
 
-                softmax_class = HierarchicalNet.softmax(self.feedforward(image))
-                if np.argmax(softmax_class) == np.argmax(label):
+                valid_O = self.feedforward(image)
+                if np.argmax(valid_O) == np.argmax(label):
                     valid_acc += 1
-                valid_loss += HierarchicalNet.softmax_cross_entropy(label, softmax_class)
+                valid_loss += HierarchicalNet.softmax_cross_entropy(label, valid_O)
             valid_acc /= len(valid_images)
             valid_acc *= 100
             valid_loss /= len(valid_images)
@@ -245,10 +231,10 @@ class HierarchicalNet:
         for test_idx in range(len(test_images)):
             image, label = test_images[test_idx], test_labels[test_idx]
 
-            softmax_class = HierarchicalNet.softmax(self.feedforward(image))
-            if np.argmax(softmax_class) == np.argmax(label):
+            test_O = self.feedforward(image)
+            if np.argmax(test_O) == np.argmax(label):
                 test_acc += 1
-            test_loss += HierarchicalNet.softmax_cross_entropy(label, softmax_class)
+            test_loss += HierarchicalNet.softmax_cross_entropy(label, test_O)
 
         test_acc /= len(test_images)
         test_loss /= len(test_images)
@@ -316,6 +302,20 @@ class HierarchicalNet:
     def softmax(x):
         sum = np.sum(np.exp(x))
         return np.exp(x) / sum
+
+    @staticmethod
+    def softmax_derv(x):
+        softmax_x = HierarchicalNet.softmax(x)
+        jacobian_m = np.diag(softmax_x)
+
+        for i in range(len(jacobian_m)):
+            for j in range(len(jacobian_m)):
+                if i == j:
+                    jacobian_m[i, j] = softmax_x[i] * (1 - softmax_x[i])
+                else:
+                    jacobian_m[i, j] = -softmax_x[i] * softmax_x[j]
+
+        return jacobian_m
 
     @staticmethod
     def leaky_relu(x):

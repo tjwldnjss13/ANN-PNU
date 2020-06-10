@@ -26,17 +26,12 @@ class ConstrainedNet:
         self.W_H1toH2 = 2 * np.random.random((2, 5, 5)) - 1
         self.W_H2toO = 2 * np.random.random((16, 10)) - 1
 
-        self.b_H1 = 2 * np.random.random((2, 8, 8)) - 1
-        self.b_H2 = 2 * np.random.random((4, 4)) - 1
-        self.b_O = 2 * np.random.random(10) - 1
-        # b_H1, b_H2, b_O = 1, 1, 1
-
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
 
-        train_images, train_labels = images[:350], labels[:350]
-        valid_images, valid_labels = images[350:425], labels[300:425]
-        test_images, test_labels = images[425:], labels[425:]
+        train_images, train_labels = images[:300], labels[:300]
+        valid_images, valid_labels = images[300:400], labels[300:400]
+        test_images, test_labels = images[400:], labels[400:]
 
         self.train([train_images, train_labels], [valid_images, valid_labels])
         self.test([test_images, test_labels])
@@ -93,18 +88,18 @@ class ConstrainedNet:
             for i in range(8):
                 for j in range(8):
                     pre_H1[k, i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] * self.W_ItoH1)
-        post_H1 = ConstrainedNet.relu(pre_H1) + self.b_H1
+        post_H1 = ConstrainedNet.relu(pre_H1)
 
         pre_H2 = np.zeros((4, 4))
         for k in range(2):
             for i in range(4):
                 for j in range(4):
                     pre_H2[i, j] += np.sum(post_H1[k, i:i + 5, j:j + 5] * self.W_H1toH2[k])
-        post_H2 = ConstrainedNet.relu(pre_H2) + self.b_H2
+        post_H2 = ConstrainedNet.relu(pre_H2)
 
         post_H2_flattened = np.reshape(post_H2, 16)
         pre_O = np.matmul(post_H2_flattened, self.W_H2toO)
-        post_O = ConstrainedNet.sigmoid(pre_O) + self.b_O
+        post_O = ConstrainedNet.softmax(pre_O)
 
         return post_O
 
@@ -132,32 +127,32 @@ class ConstrainedNet:
                     for i in range(8):
                         for j in range(8):
                             pre_H1[k, i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] * self.W_ItoH1)
-                post_H1 = ConstrainedNet.relu(pre_H1) + self.b_H1
+                post_H1 = ConstrainedNet.relu(pre_H1)
 
                 pre_H2 = np.zeros((4, 4))
                 for k in range(2):
                     for i in range(4):
                         for j in range(4):
                             pre_H2[i, j] += np.sum(post_H1[k, i:i + 5, j:j + 5] * self.W_H1toH2[k])
-                post_H2 = ConstrainedNet.relu(pre_H2) + self.b_H2
+                post_H2 = ConstrainedNet.relu(pre_H2)
 
                 post_H2_flattened = np.reshape(post_H2, 16)
                 pre_O = np.matmul(post_H2_flattened, self.W_H2toO)
-                post_O = ConstrainedNet.sigmoid(pre_O) + self.b_O
+                post_O = ConstrainedNet.softmax(pre_O)
 
-                softmax_class = ConstrainedNet.softmax(post_O)
-                softmax_ce = ConstrainedNet.softmax_cross_entropy(label, softmax_class)
-                if np.argmax(softmax_class) == np.argmax(label):
+                softmax_ce = ConstrainedNet.softmax_cross_entropy(label, post_O)
+                if np.argmax(post_O) == np.argmax(label):
                     train_acc += 1
                 train_loss += softmax_ce
 
                 # Backpropagate
                 # O
-                D_post_O = softmax_class - label
-                D_pre_O = D_post_O * ConstrainedNet.sigmoid_derv(pre_O)
-
-                # Bias (O)
-                self.b_O -= self.lr_b * D_post_O
+                D_post_O = post_O - label
+                softmax_derv_m = ConstrainedNet.softmax_derv(pre_O)
+                D_pre_O = np.zeros(10)
+                for i in range(10):
+                    for j in range(10):
+                        D_pre_O[i] += D_post_O[j] * softmax_derv_m[i, j]
 
                 # Weight (H2 -- O)
                 W_H2toO_old = self.W_H2toO
@@ -176,9 +171,6 @@ class ConstrainedNet:
                 for i in range(4):
                     for j in range(4):
                         D_pre_H2[i, j] = D_post_H2[i, j] * ConstrainedNet.relu_derv(pre_H2[i, j])
-
-                # Bias (H2)
-                self.b_H2 -= self.lr_b * D_post_H2
 
                 # Weight (H1 -- H2)
                 W_H1toH2_old = self.W_H1toH2
@@ -205,9 +197,6 @@ class ConstrainedNet:
                             D_post_H1[k, i, j] = np.sum(D_pre_H2_padded[i:i + 5, j:j + 5] * W_H1toH2_old_inv[k])
                             D_pre_H1[k, i, j] = D_post_H1[k, i, j] * ConstrainedNet.relu_derv(pre_H1[k, i, j])
 
-                # Bias (H1)
-                self.b_H1 -= self.lr_b * D_post_H1
-
                 # Weight (I -- H1)
                 for k in range(2):
                     for i in range(3):
@@ -227,10 +216,10 @@ class ConstrainedNet:
                 image = valid_images[valid_idx]
                 label = valid_labels[valid_idx]
 
-                softmax_class = ConstrainedNet.softmax(self.feedforward(image))
-                if np.argmax(softmax_class) == np.argmax(label):
+                valid_O = self.feedforward(image)
+                if np.argmax(valid_O) == np.argmax(label):
                     valid_acc += 1
-                valid_loss += ConstrainedNet.softmax_cross_entropy(label, softmax_class)
+                valid_loss += ConstrainedNet.softmax_cross_entropy(label, valid_O)
             valid_acc /= len(valid_images)
             valid_loss /= len(valid_images)
             print('(Valid) Accuracy : {:.4f}, Loss : {:.5f}'.format(valid_acc, valid_loss))
@@ -244,10 +233,10 @@ class ConstrainedNet:
         for test_idx in range(len(test_images)):
             image, label = test_images[test_idx], test_labels[test_idx]
 
-            softmax_class = ConstrainedNet.softmax(self.feedforward(image))
-            if np.argmax(softmax_class) == np.argmax(label):
+            test_O = self.feedforward(image)
+            if np.argmax(test_O) == np.argmax(label):
                 test_acc += 1
-            test_loss += ConstrainedNet.softmax_cross_entropy(label, softmax_class)
+            test_loss += ConstrainedNet.softmax_cross_entropy(label, test_O)
 
         test_acc /= len(test_images)
         test_loss /= len(test_images)
@@ -321,6 +310,20 @@ class ConstrainedNet:
     def softmax(x):
         sum = np.sum(np.exp(x))
         return np.exp(x) / sum
+
+    @staticmethod
+    def softmax_derv(x):
+        softmax_x = ConstrainedNet.softmax(x)
+        jacobian_m = np.diag(softmax_x)
+
+        for i in range(len(jacobian_m)):
+            for j in range(len(jacobian_m)):
+                if i == j:
+                    jacobian_m[i, j] = softmax_x[i] * (1 - softmax_x[i])
+                else:
+                    jacobian_m[i, j] = -softmax_x[i] * softmax_x[j]
+
+        return jacobian_m
 
     @staticmethod
     def leaky_relu(x):

@@ -25,17 +25,12 @@ class LocallyConnectedNet:
         self.W_H1toH2 = 2 * np.random.random((5, 5)) - 1
         self.W_H2toO = 2 * np.random.random((16, 10)) - 1
 
-        self.b_H1 = 2 * np.random.random((8, 8)) - 1
-        self.b_H2 = 2 * np.random.random((4, 4)) - 1
-        self.b_O = 2 * np.random.random(10) - 1
-        # b_H1, b_H2, b_O = 1, 1, 1
-
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
 
-        train_images, train_labels = images[:60], labels[:60]
-        valid_images, valid_labels = images[60:80], labels[60:80]
-        test_images, test_labels = images[80:], labels[80:]
+        train_images, train_labels = images[:350], labels[:350]
+        valid_images, valid_labels = images[350:425], labels[350:425]
+        test_images, test_labels = images[425:], labels[425:]
 
         self.train([train_images, train_labels], [valid_images, valid_labels])
         self.test([test_images, test_labels])
@@ -45,7 +40,7 @@ class LocallyConnectedNet:
         images = []
         labels = []
 
-        for n in range(10):
+        for n in range(50):
             for label in range(10):
                 fn = str(label) + '.' + str(n) + '.png'
                 image_path = os.path.join(fp, fn)
@@ -91,19 +86,19 @@ class LocallyConnectedNet:
         for i in range(8):
             for j in range(8):
                 pre_H1[i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] * self.W_ItoH1)
-        post_H1 = LocallyConnectedNet.relu(pre_H1) + self.b_H1
+        post_H1 = LocallyConnectedNet.relu(pre_H1)
 
         pre_H2 = np.zeros((4, 4))
         for i in range(4):
             for j in range(4):
                 pre_H2[i, j] = np.sum(post_H1[i:i + 5, j:j + 5] * self.W_H1toH2)
-        post_H2 = LocallyConnectedNet.relu(pre_H2) + self.b_H2
+        post_H2 = LocallyConnectedNet.relu(pre_H2)
 
         post_H2_flat = np.reshape(post_H2, 16)
         pre_O = np.zeros(10)
         for i in range(10):
             pre_O[i] = np.sum(post_H2_flat * self.W_H2toO[:, i])
-        post_O = LocallyConnectedNet.sigmoid(pre_O) + self.b_O
+        post_O = LocallyConnectedNet.softmax(pre_O)
 
         return post_O
 
@@ -126,26 +121,23 @@ class LocallyConnectedNet:
                 for i in range(8):
                     for j in range(8):
                         pre_H1[i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] * self.W_ItoH1)
-                post_H1 = self.relu(pre_H1) + self.b_H1
+                post_H1 = self.relu(pre_H1)
 
                 pre_H2 = np.zeros((4, 4))
                 for i in range(4):
                     for j in range(4):
                         pre_H2[i, j] = np.sum(post_H1[i:i + 5, j:j + 5] * self.W_H1toH2)
-                post_H2 = LocallyConnectedNet.relu(pre_H2) + self.b_H2
+                post_H2 = LocallyConnectedNet.relu(pre_H2)
 
                 post_H2_flat = np.reshape(post_H2, 16)
                 pre_O = np.zeros(10)
                 for i in range(10):
                     pre_O[i] = np.sum(post_H2_flat * self.W_H2toO[:, i])
-                post_O = LocallyConnectedNet.sigmoid(pre_O) + self.b_O
 
-                softmax_class = LocallyConnectedNet.softmax(post_O)
+                post_O = LocallyConnectedNet.softmax(pre_O)
 
-                # out, softmax_class = feedforward(image, label)
-
-                softmax_ce = LocallyConnectedNet.softmax_cross_entropy(label, softmax_class)
-                if np.argmax(softmax_class) == np.argmax(label):
+                softmax_ce = LocallyConnectedNet.softmax_cross_entropy(label, post_O)
+                if np.argmax(post_O) == np.argmax(label):
                     train_acc += 1
 
                 train_loss += softmax_ce
@@ -153,13 +145,12 @@ class LocallyConnectedNet:
                 # Backpropagate
 
                 # O
-                D_post_O = softmax_class - label
+                D_post_O = post_O - label
+                softmax_derv_m = LocallyConnectedNet.softmax_derv(pre_O)
                 D_pre_O = np.zeros(10)
                 for i in range(10):
-                    D_pre_O[i] = D_post_O[i] * LocallyConnectedNet.sigmoid_derv(pre_O[i])
-
-                # Bias (O)
-                self.b_O -= self.lr_b * D_post_O
+                    for j in range(10):
+                        D_pre_O[i] += D_post_O[j] * softmax_derv_m[i, j]
 
                 # Weight (H2 -- O)
                 W_H2toO_old = self.W_H2toO
@@ -177,9 +168,6 @@ class LocallyConnectedNet:
                 for i in range(4):
                     for j in range(4):
                         D_pre_H2[i, j] = D_post_H2[i, j] * LocallyConnectedNet.relu_derv(pre_H2[i, j])
-
-                # Bias (H2)
-                self.b_H2 -= self.lr_b * D_post_H2
 
                 # Weight (H1 -- H2)
                 W_H1toH2_old = self.W_H1toH2
@@ -201,8 +189,6 @@ class LocallyConnectedNet:
                         D_post_H1[i, j] = np.sum(D_pre_H2_padded[i:i + 5, j:j + 5] * W_H1toH2_old_inv)
                         D_pre_H1[i, j] = D_post_H1[i, j] * LocallyConnectedNet.relu_derv(pre_H1[i, j])
 
-                # Bias (H1)
-                self.b_H1 -= self.lr_b * D_post_H1
 
                 # Weight (I -- H1)
                 for i in range(3):
@@ -222,10 +208,10 @@ class LocallyConnectedNet:
                 image = valid_images[valid_idx]
                 label = valid_labels[valid_idx]
 
-                softmax_class = LocallyConnectedNet.softmax(self.feedforward(image))
-                if np.argmax(softmax_class) == np.argmax(label):
+                valid_O = self.feedforward(image)
+                if np.argmax(valid_O) == np.argmax(label):
                     valid_acc += 1
-                valid_loss += LocallyConnectedNet.softmax_cross_entropy(label, softmax_class)
+                valid_loss += LocallyConnectedNet.softmax_cross_entropy(label, valid_O)
             valid_acc /= len(valid_images)
             valid_loss /= len(valid_images)
             print('(Valid) Accuracy : {:.4f}, Loss : {:.5f}'.format(valid_acc, valid_loss))
@@ -312,6 +298,20 @@ class LocallyConnectedNet:
         return np.exp(x) / sum
 
     @staticmethod
+    def softmax_derv(x):
+        softmax_x = LocallyConnectedNet.softmax(x)
+        jacobian_m = np.diag(softmax_x)
+
+        for i in range(len(jacobian_m)):
+            for j in range(len(jacobian_m)):
+                if i == j:
+                    jacobian_m[i, j] = softmax_x[i] * (1 - softmax_x[i])
+                else:
+                    jacobian_m[i, j] = -softmax_x[i] * softmax_x[j]
+
+        return jacobian_m
+
+    @staticmethod
     def leaky_relu(x):
         return np.maximum(.01 * x, x)
 
@@ -346,5 +346,5 @@ if __name__ == '__main__':
     # PREWITT_Y : .01 (0.4667)
     # LAPLACIAN :
     # LOG : .005 (.40)
-    lcn1 = LocallyConnectedNet(lr=.0005, epochs=2000)
+    lcn1 = LocallyConnectedNet(lr=.005, epochs=1000)
     lcn1.exec_all('./digit data', LAPLACIAN)
