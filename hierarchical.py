@@ -21,7 +21,7 @@ class HierarchicalNet:
 
         self.W_ItoH1 = 2 * np.random.random((3, 3)) - 1
         self.W_H1toH2 = 2 * np.random.random((5, 5)) - 1
-        self.W_H2toO = 2 * np.random.random((16, 10)) - 1
+        self.W_H2toO = 2 * np.random.random((64, 10)) - 1
 
     def exec_all(self, fp, filter=None):
         images, labels = self.dataset(fp, filter)
@@ -38,7 +38,7 @@ class HierarchicalNet:
         images = []
         labels = []
 
-        for n in range(10):
+        for n in range(50):
             for label in range(10):
                 fn = str(label) + '.' + str(n) + '.png'
                 image_path = os.path.join(fp, fn)
@@ -63,21 +63,30 @@ class HierarchicalNet:
     @staticmethod
     def preprocessed_image(image_file, filter):
         image = np.array(image_file)
-        image_padded = np.zeros((17, 17))
         if filter is None:
+            image_padded = np.zeros((17, 17))
             image = image.astype('float32') / 255
-            image_padded[:17, :17] = image
+            image_padded[:16, :16] = image
+
+            return image_padded
         else:
             f_size = len(filter)
-            if_size = 16 - f_size + 1
-            image_filtered = np.zeros((if_size, if_size))
-            for i in range(if_size):
-                for j in range(if_size):
-                    image_filtered[i, j] = np.sum(image[i:i+f_size, j:j+f_size] * filter)
-            image_filtered = image_filtered.astype('float32') / 255
-            image_padded[1:1+if_size, 1:1+if_size] = image_filtered
+            # if_size = 16 - f_size + 1
+            image_filtered = np.zeros((17, 17))
+            image_padded = np.zeros((16 + f_size, 16 + f_size))
+            for i in range(16 + f_size):
+                for j in range(16 + f_size):
+                    image_padded[i, j] = 255
 
-        return image_padded
+            image_padded[int(f_size / 2):int(f_size / 2) + 16, int(f_size / 2): int(f_size / 2) + 16] = image
+
+            for i in range(17):
+                for j in range(17):
+                    image_filtered[i, j] = np.sum(image_padded[i:i + f_size, j:j + f_size] * filter)
+            image_filtered = image_filtered.astype('float32') / 255
+            # image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+
+            return image_filtered
 
     def feedforward(self, image):
         pre_H1 = np.zeros((2, 8, 8))
@@ -85,7 +94,7 @@ class HierarchicalNet:
             for i in range(8):
                 for j in range(8):
                     pre_H1[k1, i, j] = np.sum(image[2 * i:2 * i + 3, 2 * j:2 * j + 3] *self.W_ItoH1)
-        post_H1 = HierarchicalNet.relu(pre_H1) + self.b_H1
+        post_H1 = HierarchicalNet.relu(pre_H1)
 
         pre_H2 = np.zeros((4, 4, 4))
         for k1 in range(2):
@@ -93,11 +102,11 @@ class HierarchicalNet:
                 for i in range(4):
                     for j in range(4):
                         pre_H2[k2, i, j] += np.sum(post_H1[k1, i:i + 5, j:j + 5] * self.W_H1toH2)
-        post_H2 = HierarchicalNet.relu(pre_H2) + self.b_H2
+        post_H2 = HierarchicalNet.relu(pre_H2)
 
         post_H2_flattened = np.reshape(post_H2, 4 * 4 * 4)
         pre_O = np.matmul(post_H2_flattened, self.W_H2toO)
-        post_O = HierarchicalNet.sigmoid(pre_O) + self.b_O
+        post_O = HierarchicalNet.sigmoid(pre_O)
 
         return post_O
 
@@ -200,9 +209,8 @@ class HierarchicalNet:
                             self.W_ItoH1[i, j] -= self.lr * np.sum(image[i:i + 15:2, j:j + 15:2] * D_pre_H1[k1])
 
             train_acc /= len(train_images)
-            train_acc *= 100
             train_loss /= len(train_images)
-            print('(Train) Accuracy : {:.1f}%, Loss : {:.5f}'.format(train_acc, train_loss), end='   ')
+            print('(Train) Accuracy : {:.4f}, Loss : {:.5f}'.format(train_acc, train_loss), end='   ')
             self.train_loss_list.append(train_loss)
             self.train_acc_list.append(train_acc)
 
@@ -218,9 +226,8 @@ class HierarchicalNet:
                     valid_acc += 1
                 valid_loss += HierarchicalNet.softmax_cross_entropy(label, valid_O)
             valid_acc /= len(valid_images)
-            valid_acc *= 100
             valid_loss /= len(valid_images)
-            print('(Valid) Accuracy : {:.1f}%, Loss : {:.5f}'.format(valid_acc, valid_loss))
+            print('(Valid) Accuracy : {:.4f}, Loss : {:.5f}'.format(valid_acc, valid_loss))
             self.valid_loss_list.append(valid_loss)
             self.valid_acc_list.append(valid_acc)
 
@@ -346,5 +353,6 @@ class HierarchicalNet:
 
 
 if __name__ == '__main__':
-    hn1 = HierarchicalNet(epochs=500)
-    hn1.exec_all('../digit data', SOBEL_X)
+    hn1 = HierarchicalNet(lr=.04, epochs=500)
+    gf = gabor(1, np.pi / 2, 4 * np.pi, 0, 1)
+    hn1.exec_all('./digit data', gf)

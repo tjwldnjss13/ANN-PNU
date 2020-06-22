@@ -65,21 +65,49 @@ class LocallyConnectedNet:
     @staticmethod
     def preprocessed_image(image_file, filter):
         image = np.array(image_file)
-        image_padded = np.zeros((17, 17))
         if filter is None:
+            image_padded = np.zeros((17, 17))
             image = image.astype('float32') / 255
-            image_padded[:17, :17] = image
+            image_padded[:16, :16] = image
+
+            return image_padded
         else:
             f_size = len(filter)
-            if_size = 16 - f_size + 1
-            image_filtered = np.zeros((if_size, if_size))
-            for i in range(if_size):
-                for j in range(if_size):
-                    image_filtered[i, j] = np.sum(image[i:i + f_size, j:j + f_size] * filter)
-            image_filtered = image_filtered.astype('float32') / 255
-            image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+            # if_size = 16 - f_size + 1
+            image_filtered = np.zeros((17, 17))
+            image_padded = np.zeros((16 + f_size, 16 + f_size))
+            for i in range(16 + f_size):
+                for j in range(16 + f_size):
+                    image_padded[i, j] = 255
 
-        return image_padded
+            image_padded[int(f_size / 2):int(f_size / 2) + 16, int(f_size / 2): int(f_size / 2) + 16] = image
+
+            for i in range(17):
+                for j in range(17):
+                    image_filtered[i, j] = np.sum(image_padded[i:i + f_size, j:j + f_size] * filter)
+            image_filtered = image_filtered.astype('float32') / 255
+            # image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+
+            return image_filtered
+
+    # @staticmethod
+    # def preprocessed_image(image_file, filter):
+    #     image = np.array(image_file)
+    #     image_padded = np.zeros((17, 17))
+    #     if filter is None:
+    #         image = image.astype('float32') / 255
+    #         image_padded[:17, :17] = image
+    #     else:
+    #         f_size = len(filter)
+    #         if_size = 16 - f_size + 1
+    #         image_filtered = np.zeros((if_size, if_size))
+    #         for i in range(if_size):
+    #             for j in range(if_size):
+    #                 image_filtered[i, j] = np.sum(image[i:i + f_size, j:j + f_size] * filter)
+    #         image_filtered = image_filtered.astype('float32') / 255
+    #         image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+    #
+    #     return image_padded
 
     def feedforward(self, image):
         pre_H1 = np.zeros((8, 8))
@@ -346,5 +374,5 @@ if __name__ == '__main__':
     # PREWITT_Y : .01 (0.4667)
     # LAPLACIAN :
     # LOG : .005 (.40)
-    lcn1 = LocallyConnectedNet(lr=.005, epochs=1000)
+    lcn1 = LocallyConnectedNet(lr=.07, epochs=1000)
     lcn1.exec_all('./digit data', LAPLACIAN)

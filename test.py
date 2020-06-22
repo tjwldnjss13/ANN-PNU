@@ -1,14 +1,23 @@
-import numpy as np
+from filters import *
+from constrained_network import *
+from PIL import Image
+import cv2 as cv
 
-a = np.zeros(5)
-b = np.array([1, 2, 3, 4, 5])
+g = gabor(1, np.pi / 4, 4 * np.pi, 0, 1)
+plt.imshow(g)
+plt.show()
 
-m = np.array([[-1, -1, -1, -1, -1],
-             [-2, -2, -2, -2, -2],
-             [-3, -3, -3, -3, -3],
-             [-4, -4, -4, -4, -4],
-             [-5, -5, -5, -5, -5]])
+img = Image.open('digit data/8.0.png').convert('L')
 
-for i in range(5):
-    a[i] += np.sum(m[i])
-print(a)
+cn = ConstrainedNet()
+img = cn.preprocessed_image(img, g)
+print(img.shape)
+plt.imshow(img)
+plt.show()
+
+kernel = cv.getGaborKernel((5, 5), 1, np.pi / 4, .5, 0, ktype=cv.CV_32F)
+
+
+
+
+

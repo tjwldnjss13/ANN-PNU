@@ -63,24 +63,55 @@ class ConstrainedNet:
 
         return images, labels
 
+
+
     @staticmethod
     def preprocessed_image(image_file, filter):
         image = np.array(image_file)
-        image_padded = np.zeros((17, 17))
         if filter is None:
+            image_padded = np.zeros((17, 17))
             image = image.astype('float32') / 255
-            image_padded[:17, :17] = image
+            image_padded[:16, :16] = image
+
+            return image_padded
         else:
             f_size = len(filter)
-            if_size = 16 - f_size + 1
-            image_filtered = np.zeros((if_size, if_size))
-            for i in range(if_size):
-                for j in range(if_size):
-                    image_filtered[i, j] = np.sum(image[i:i + f_size, j:j + f_size] * filter)
-            image_filtered = image_filtered.astype('float32') / 255
-            image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+            # if_size = 16 - f_size + 1
+            image_filtered = np.zeros((17, 17))
+            image_padded = np.zeros((16 + f_size, 16 + f_size))
+            for i in range(16 + f_size):
+                for j in range(16 + f_size):
+                    image_padded[i, j] = 255
 
-        return image_padded
+            image_padded[int(f_size / 2):int(f_size / 2) + 16, int(f_size / 2): int(f_size / 2) + 16] = image
+
+            for i in range(17):
+                for j in range(17):
+                    image_filtered[i, j] = np.sum(image_padded[i:i + f_size, j:j + f_size] * filter)
+            image_filtered = image_filtered.astype('float32') / 255
+            # image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+
+            return image_filtered
+
+    # @staticmethod
+    # def preprocessed_image(image_file, filter):
+    #     image = np.array(image_file)
+    #     image_padded = np.zeros((17, 17))
+    #     if filter is None:
+    #         image = image.astype('float32') / 255
+    #         image_padded[:17, :17] = image
+    #     else:
+    #         f_size = len(filter)
+    #         if_size = 16 - f_size + 1
+    #         image_filtered = np.zeros((if_size, if_size))
+    #         for i in range(if_size):
+    #             for j in range(if_size):
+    #                 image_filtered[i, j] = np.sum(image[i:i + f_size, j:j + f_size] * filter)
+    #         image_filtered = image_filtered.astype('float32') / 255
+    #         image_padded[1:1 + if_size, 1:1 + if_size] = image_filtered
+    #
+    #     return image_padded
+
 
     def feedforward(self, image):
         pre_H1 = np.zeros((2, 8, 8))
@@ -266,9 +297,10 @@ class ConstrainedNet:
         plt.title('Train/Validation Acc')
         plt.legend()
 
-        plt.figure(2)
-        plt.plot(epochs, lrs, 'g-', label='Learning curve')
-        plt.title('Learning Curve')
+        if self.lr_decay is not None:
+            plt.figure(2)
+            plt.plot(epochs, lrs, 'g-', label='Learning curve')
+            plt.title('Learning Curve')
 
         plt.show()
 
@@ -354,6 +386,11 @@ class ConstrainedNet:
 
 
 if __name__ == '__main__':
-    # SOBEL_X : .01 (.33)
-    cn1 = ConstrainedNet(lr=.01, epochs=500)
-    cn1.exec_all('./digit data', LAPLACIAN)
+    # SOBEL_X : .0047985 (.55)
+    # SOBEL_Y : .00425 (.50)
+    # PREWITT_X : .004855 (.55)
+    # PREWITT_Y : .00425 (.51)
+    # LAPLACIAN : .00708 (.45)
+    # LOG : .007 (.33)
+    cn1 = ConstrainedNet(lr=.006, epochs=500)
+    cn1.exec_all('./digit data', LOG)
